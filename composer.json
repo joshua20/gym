@@ -1,0 +1,81 @@
+{
+    "name": "laravel/laravel",
+    "description": "The Laravel Framework.",
+    "keywords": ["framework", "laravel"],
+    "license": "MIT",
+    "type": "project",
+    "require": {
+        "php": ">=5.6.4",
+        "barryvdh/laravel-debugbar": "^3.0",
+        "barryvdh/laravel-dompdf": "^1.0",
+        "barryvdh/laravel-ide-helper": "^2.4",
+        "cviebrock/eloquent-sluggable": "^8.0",
+        "doctrine/dbal": "^2.6",
+        "froiden/laravel-installer": "^1.4",
+        "guzzlehttp/guzzle": "~6.1",
+        "intervention/image": "*",
+        "jenssegers/agent": "^2.5",
+        "laravel/framework": "^8.0",
+        "laravel/helpers": "*",
+        "laravel/socialite": "^5.0",
+        "laravel/tinker": "^2.0",
+        "laravelcollective/html": "^6.0",
+        "league/flysystem-aws-s3-v3": "^1.0",
+        "maatwebsite/excel": "^3.1.0",
+        "nesbot/carbon": "^2.31",
+        "oriceon/oauth-5-laravel": "dev-master",
+        "paragonie/random_compat": "~1.2",
+        "razorpay/razorpay": "1.*",
+        "simplesoftwareio/simple-qrcode": "~1",
+        "spatie/laravel-activitylog": "^4.0",
+        "spatie/laravel-backup": "^6.0",
+        "spatie/laravel-permission": "*",
+        "yajra/laravel-datatables-oracle": "^10.0"
+    },
+    "require-dev": {
+        "fzaninotto/faker": "~1.4",
+        "mockery/mockery": "0.9.*",
+        "phpunit/phpunit": "^9.5",
+        "symfony/css-selector": "2.8.*|3.0.*",
+        "symfony/dom-crawler": "2.8.*|3.0.*"
+    },
+    "autoload": {
+        "classmap": [
+            "database"
+        ],
+        "psr-4": {
+            "App\\": "app/"
+        },
+        "files": ["app/globalFunctions.php"]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-root-package-install": [
+            "php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "php artisan key:generate"
+        ],
+        "post-install-cmd": [
+            "Illuminate\\Foundation\\ComposerScripts::postInstall",
+            "php artisan optimize"
+        ],
+        "post-update-cmd": [
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate",
+            "php artisan optimize"
+        ]
+    },
+    "config": {
+        
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "kylekatarnls/update-helper": true
+        }
+    }
+}
