@@ -39,29 +39,41 @@ class GymAdminAttendanceController extends GymAdminBaseController
         return view('gym-admin.attendance.create', $this->data);
     }
 
-    public function markAttendance(Request $request) {
-        $this->authorize('add_attendance'); // Laravel's authorization method
+    public function markAttendance(Request $request)
+    {
+        // Authorization check
+        if (!auth()->user()->can('add_attendance')) {
+            abort(403, 'Unauthorized action.');
+        }
     
+        // Validate the request
         $validated = $request->validate([
-            'clientId' => 'required|exists:gym_clients,id',
-            'date' => 'required|date_format:d/M/Y H:ia'
+            'date' => 'required|date_format:d/M/Y h:ia',
+            'clientId' => 'required|integer|exists:gym_clients,id', // Assuming gym_clients is the related table
         ]);
     
-        $date = Carbon::createFromFormat('d/M/Y H:ia', $validated['date'])
-            ->format('Y-m-d H:i:s');
+        // Parse and format the date
+        $date = Carbon::createFromFormat('d/M/Y h:ia', $validated['date'])->format('Y-m-d H:i:s');
     
-        $attendance = GymClientAttendance::markAttendance($validated['clientId'], $date);
+        // Mark attendance
+        $data = GymClientAttendance::markAttendance($validated['clientId'], $date);
     
+        // Return success response
         return response()->json([
-            'message' => 'Attendance marked successfully',
-            'data' => ['id' => $attendance->id]
+            'status' => 'success',
+            'message' => 'Attendance marked successfully.',
+            'data' => ['id' => $data->id],
         ]);
     }
 
-    public function checkin($Id) {
-        $this->data['id'] = $Id;
-        return View::make('gym-admin.attendance.checkin', $this->data);
-    }
+    public function checkin($Id)
+{
+    // Set data for the view
+    $this->data['id'] = $Id;
+
+    // Return the checkin view
+    return view('gym-admin.attendance.checkin', $this->data);
+}
 
     public function destroy($id) {
         GymClientAttendance::destroy($id);
@@ -69,66 +81,44 @@ class GymAdminAttendanceController extends GymAdminBaseController
 
     }
 
-    public function ajax_create(Request $request)
+    public function ajax_Create(Request $request)
 {
-    // Ensure the user has permission to add attendance
-    abort_unless($this->data['user']->can('add_attendance'), 401);
-
-    // Validate and parse the date
-    $date = $request->has('date') 
-        ? Carbon::createFromFormat('d/M/Y', $request->date)->format('Y-m-d') 
-        : Carbon::today()->format('Y-m-d');
-
-    $search = $request->input('search', '');
-    $draw = intval($request->input('draw', 0));
-    $start = intval($request->input('start', 0));
-    $length = intval($request->input('length', 10));
-
-    // Base query for client attendance
-    $query = GymClientAttendance::clientAttendanceByDate($date, $search, $this->data['user']->detail_id);
-
-    // Total records before filtering
-    $totalRecords = $query->count();
-
-    // Apply global search if needed
-    if (!empty($search)) {
-        $query->where(function($q) use ($search) {
-            $q->where('first_name', 'LIKE', "%{$search}%")
-              ->orWhere('last_name', 'LIKE', "%{$search}%");
-        });
+    // Ensure the user is authenticated
+    $user = auth()->user();
+    if (!$user || !$user->can('add_attendance')) {
+        abort(403, 'Unauthorized action.');
     }
 
-    // Count filtered records
-    $filteredRecords = $query->count();
-
-    // Apply pagination
-    $clientAttendance = $query->skip($start)->take($length)->get();
-
-    // Generate the DataTable response
-    return response()->json([
-        'draw' => $draw,
-        'recordsTotal' => $totalRecords,
-        'recordsFiltered' => $filteredRecords,
-        'data' => $clientAttendance->map(function ($row) {
-            return [
-                'id' => $row->id,
-                'first_name' => $row->first_name,
-                'last_name' => $row->last_name,
-                'full_name' => $row->first_name . ' ' . $row->last_name,
-                'joining_date' => $row->joining_date,
-                'check_in' => $row->check_in,
-                'status' => $row->status,
-                'image' => $row->image ?: '',
-                'checkin_id' => $row->checkin_id,
-                'total_checkin' => $row->total_checkin ?: 0,
-                'actions' => view('gym-admin.attendance.ajaxview', [
-                    'row' => $row,
-                    'imageURL' => $this->data['profileHeaderPath'],
-                    'gymSettings' => $this->data['gymSettings'],
-                    'defaultImageURL' => $this->data['profilePath'],
-                ])->render(),
-            ];
-        })->toArray(),
+    // Validate the request
+    $validated = $request->validate([
+        'date' => 'required|date_format:d/M/Y',
+        'search_data' => 'nullable|string',
     ]);
+
+    // Parse and format the date
+    $date = Carbon::createFromFormat('d/M/Y', $validated['date'])->format('Y-m-d');
+    $search = $validated['search_data'];
+
+    // Fetch attendance data
+    $clientAttendance = GymClientAttendance::clientAttendanceByDate(
+        $date, 
+        $search, 
+        $user->detail_id
+    );
+
+    // Return DataTables response
+    return DataTables::of($clientAttendance)
+        ->addColumn('id', function ($row) {
+            return view('gym-admin.attendance.ajaxview', [
+                'row' => $row,
+                'imageURL' => $this->data['profileHeaderPath'],
+                'gymSettings' => $this->data['gymSettings'],
+                'deaultImageURL' => $this->data['profilePath']
+            ])->render();
+        })
+        ->removeColumn(['first_name', 'last_name', 'joining_date', 'check_in', 'status', 'image', 'checkin_id', 'total_checkin'])
+        ->make(true);
 }
+
+
 }

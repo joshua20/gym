@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Input;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\View;
-use Yajra\Datatables\Facades\DataTables;
-use Illuminate\Support\Str;
+use Yajra\Datatables\Facades\Datatables;
 
 class GymPromotionalDbController extends GymAdminBaseController
 {
@@ -29,34 +28,45 @@ class GymPromotionalDbController extends GymAdminBaseController
         return View::make('gym-admin.promotional-db.create', $this->data);
     }
 
-    public function ajax_Create()
-    {
-        // Check if the user is authenticated
-        if (!auth()->check()) {
-            return response()->json(['error' => 'User not authenticated.'], 401);
-        }
-    
-        // Get the authenticated user
-        $user = auth()->user();
-    
-        // Ensure the user has a detail_id
-        if (is_null($user->detail_id)) {
-            return response()->json(['error' => 'User does not have a detail ID.'], 400);
-        }
-    
-        // Proceed with your query
-        $query = MerchantPromotionDatabase::query()
-            ->select('name', 'email', 'mobile', 'age', 'gender', 'id')
-            ->where('detail_id', $user->detail_id);
-    
-        return DataTables::of($query)
-            ->editColumn('name', fn($row) => Str::title($row->name))
-            ->editColumn('email', fn($row) => "<i class='fa fa-envelope'></i> {$row->email}")
-            ->editColumn('mobile', fn($row) => "<i class='fa fa-mobile'></i> {$row->mobile}")
-            ->rawColumns(['email', 'mobile'])
-            ->make(true);
+    public function ajax_create() {
+        $db = MerchantPromotionDatabase::select('name', 'email', 'mobile', 'age', 'gender', 'id')
+            ->where('detail_id', '=', $this->data['user']->detail_id);
+        return Datatables::of($db)
+            ->edit_column('name', function ($row) {
+                return ucwords($row->name);
+            })
+            ->edit_column('email', function ($row) {
+                return '<i class="fa fa-envelope"></i> ' . $row->email;
+            })
+            ->edit_column('mobile', function ($row) {
+                return '<i class="fa fa-mobile"></i> ' . $row->mobile;
+            })->edit_column('gender', function ($row) {
+                if ($row->gender == 'female') {
+                    return '<i class="fa fa-female"></i> Female';
+                }
+                else {
+                    return '<i class="fa fa-male"></i> Male';
+                }
+            })
+            ->add_column('action', function ($row) {
+                return "<div class=\"btn-group\">
+                    <button class=\"btn blue btn-xs dropdown-toggle\" type=\"button\" data-toggle=\"dropdown\"><i class=\"fa fa-gears\"></i> <span class=\"hidden-xs\">Actions</span>
+                        <i class=\"fa fa-angle-down\"></i>
+                    </button>
+                    <ul class=\"dropdown-menu pull-right\" role=\"menu\">
+                        <li>
+                            <a href='" . route('gym-admin.promotion-db.show', $row->id) . "'> <i class=\"fa fa-edit\"></i> Edit</a>
+                        </li>
+                        <li>
+                            <a href=\"javascript:;\" class='remove-target' data-id=$row->id> <i class=\"fa fa-trash\"></i> Remove</a>
+                        </li>
+                    </ul>
+                </div>";
+            })->remove_column('id')
+            ->rawColumns([1,2,4,5])
+            ->make();
     }
-    
+
     public function store() {
         $validator = Validator::make(Input::all(), MerchantPromotionDatabase::rules('add', null));
 

@@ -14,9 +14,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Input;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Yajra\DataTables\Facades\DataTables;
-// use Illuminate\Support\Facades\Gate;
-// use Illuminate\Support\Carbon;
+use Yajra\Datatables\Facades\Datatables;
 
 class GymEmailPromotionController extends GymAdminBaseController
 {
@@ -38,46 +36,48 @@ class GymEmailPromotionController extends GymAdminBaseController
         return view('gym-admin.email_promotion.index', $this->data);
     }
 
-    public function ajaxCreate()
-{
-    // Check if the user is authenticated
-    if (!auth('web')->check()) {
-        return response()->json(['error' => 'User not authenticated.'], 401);
+    public function ajaxCreate() {
+        if (!$this->data['user']->can("view_previous_promotions")) {
+            return App::abort(401);
+        }
+
+        $promotions = GymEmailCampaign::select('campaign_name', 'id', 'email_title', 'no_of_emails', 'status', 'sent_on')
+            ->where('detail_id', '=', $this->data['user']->detail_id);
+
+        return Datatables::of($promotions)
+            ->add_column(
+                'action', function ($row) {
+
+                    if($row->status == 'sent') {
+                        return "<a class='btn green btn-xs' href='" . route("gym-admin.email-promotion.edit-campaign", $row->id) . "'><i class=\"fa fa-eye\"></i> View Campaign</a>";
+                    }
+                    else {
+                        return "<a class='btn blue btn-xs' href='" . route("gym-admin.email-promotion.edit-campaign", $row->id) . "'><i class=\"fa fa-edit\"></i> Edit Campaign</a>";
+                    }
+                }
+            )
+            ->edit_column(
+                'status', function($row){
+                    if($row->status == 'draft'){
+                        return '<span class="label label-info"> DRAFT </span>';
+                    } else {
+                        return '<span class="label label-success"> SENT </span>';
+                    }
+                }
+            )
+            ->edit_column(
+                'sent_on', function($row){
+                    if(!is_null($row->sent_on)){
+                        return Carbon::createFromFormat('Y-m-d H:i:s', $row->sent_on)->format('d M, y');
+                    }
+                    else{
+                        return 'Not Sent';
+                    }
+                }
+            )
+            ->rawColumns([4,6])
+            ->make();
     }
-
-    // Get the authenticated user
-    $user = auth()->user();
-
-    // Ensure the user has a detail_id
-    if (is_null($user->detail_id)) {
-        return response()->json(['error' => 'User does not have a detail ID.'], 400);
-    }
-
-    // Query the promotions
-    $promotions = GymEmailCampaign::query()
-        ->select('campaign_name', 'id', 'email_title', 'no_of_emails', 'status', 'sent_on')
-        ->where('detail_id', $user->detail_id);
-
-    // Return data for DataTables
-    return DataTables::of($promotions)
-        ->addColumn('action', function ($row) {
-            return view('partials.email-campaign-actions', ['row' => $row]);
-        })
-        ->editColumn('status', function ($row) {
-            $statusClass = $row->status === 'draft' ? 'label-info' : 'label-success';
-            $statusText = strtoupper($row->status);
-            return "<span class='label {$statusClass}'> {$statusText} </span>";
-        })
-        ->editColumn('sent_on', function ($row) {
-            if ($row->sent_on) {
-                return Carbon::parse($row->sent_on)->format('d M, y');
-            }
-            return 'Not Sent';
-        })
-        ->rawColumns(['action', 'status'])
-        ->make(true);
-}
-
 
     public function create() {
         if (!$this->data['user']->can("send_promotions")) {
@@ -89,35 +89,27 @@ class GymEmailPromotionController extends GymAdminBaseController
         return view('gym-admin.email_promotion.create', $this->data);
     }
 
-    public function show($id)
-    {
+    public function show($id) {
         $template = GymEmailTemplates::find($id);
-    
-        // Check if the template exists
-        if (!$template) {
-            return Reply::error('Template not found.');
-        }
-    
-        // Determine the logo
+
         if (!is_null($this->data['gymSettings'])) {
-            if (!empty($this->data['gymSettings']->image)) {
+            if ($this->data['gymSettings']->image != '') {
                 $logo = asset('admin/uploads/gym_admin/logo_img/master/' . $this->data['gymSettings']->image);
-            } else {
+            }
+            else {
                 $logo = false;
             }
-        } else {
+        }
+        else {
             $logo = false;
         }
-    
-        // Prepare data to return
+
         $data = [
             'html' => $template->preview_template,
             'logo' => $logo
         ];
-    
         return Reply::successWithData('Template selected successfully.', $data);
     }
-    
 
     public function store(Request $request) {
         $validator = Validator::make($request->all(), GymEmailCampaign::$rules);
